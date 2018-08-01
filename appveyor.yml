@@ -6,8 +6,11 @@ environment:
   GOPATH: c:\gopath;c:\gopath\src\github.com\borg323\lczero-client\
   matrix:
   - NAME: .exe
+    GOOS: windows
   - NAME: _linux
-#  - NAME: mac
+    GOOS: linux
+  - NAME: mac
+    GOOS: darwin
 install:
   - echo %PATH%
   - echo %GOPATH%
