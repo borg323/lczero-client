@@ -22,7 +22,7 @@ deploy:
   - provider: GitHub
     artifact: client%NAME%
     auth_token:
-    secure: ILgB4aHwek0Pb2YWho/FKzkUy3rAPL0bIV+F+g385mMxa6zDXV1YdjJ6NgHC70lU
+      secure: ILgB4aHwek0Pb2YWho/FKzkUy3rAPL0bIV+F+g385mMxa6zDXV1YdjJ6NgHC70lU
     on:
       appveyor_repo_tag: true
 
