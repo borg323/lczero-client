@@ -9,7 +9,7 @@ environment:
     GOOS: windows
   - NAME: _linux
     GOOS: linux
-  - NAME: mac
+  - NAME: _mac
     GOOS: darwin
 install:
   - go get -u github.com/Tilps/chess
