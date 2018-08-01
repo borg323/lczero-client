@@ -1,0 +1,21 @@
+version: "{build}"
+platform: x64
+clone_folder: c:\gopath\src\github.com\borg323\lczero-client
+
+environment:
+  GOPATH: c:\gopath
+
+install:
+  - echo %PATH%
+  - echo %GOPATH%
+#  - set PATH=%GOPATH%\bin;c:\go\bin;%PATH%
+  - go version
+  - go env
+  - go get -u github.com/Tilps/chess
+
+build_script:
+  - go build lc0_main.go -o client.exe
+
+artifacts:
+  - path: client.exe
+    name: client
