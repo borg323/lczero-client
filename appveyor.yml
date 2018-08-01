@@ -14,7 +14,7 @@ install:
   - go get -u github.com/Tilps/chess
 
 build_script:
-  - go build lc0_main.go -o client.exe
+  - go build -o client.exe lc0_main.go 
 
 artifacts:
   - path: client.exe
