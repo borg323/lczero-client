@@ -4,7 +4,10 @@ clone_folder: c:\gopath\src\github.com\borg323\lczero-client
 
 environment:
   GOPATH: c:\gopath;c:\gopath\src\github.com\borg323\lczero-client\
-
+  matrix:
+  - NAME: .exe
+  - NAME: _linux
+#  - NAME: mac
 install:
   - echo %PATH%
   - echo %GOPATH%
@@ -12,10 +15,8 @@ install:
   - go version
   - go env
   - go get -u github.com/Tilps/chess
-
 build_script:
-  - go build -o client.exe lc0_main.go -i .
-
+  - go build -o client%NAME% lc0_main.go
 artifacts:
-  - path: client.exe
+  - path: client$(NAME)
     name: client
