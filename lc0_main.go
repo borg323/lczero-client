@@ -49,6 +49,7 @@ var (
 	parallel = flag.Int("parallelism", -1, "Number of games to play in parallel (-1 for default)")
 	useTestServer = flag.Bool("use-test-server", false, "Set host name to test server.")
 	keep     = flag.Bool("keep", false, "Do not delete old network files")
+	bench    = flag.Bool("bench", true, "Benchmark to stop if very slow")
 )
 
 // Settings holds username and password.
@@ -327,6 +328,54 @@ func (c *cmdWrapper) launch(networkPath string, args []string, input bool) {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func benchmark(baselinePath string) error {
+
+	if *bench == false {
+		return nil
+	}
+	baseline := createCmdWrapper()
+	params := []string{"uci"}
+	log.Println("launching")
+	baseline.launch(baselinePath, params, true)
+	defer baseline.Input.Close()
+	defer func() {
+		log.Println("Waiting for baseline to exit.")
+		baseline.Cmd.Process.Kill()
+		baseline.Cmd.Wait()
+	}()
+
+	p := baseline
+
+	log.Println("writing uci")
+	io.WriteString(baseline.Input, "uci\n")
+
+	// Play a move using UCI
+	game := chess.NewGame(chess.UseNotation(chess.LongAlgebraicNotation{}))
+
+Loop:
+	for {
+		io.WriteString(p.Input, "position startpos\n")
+		io.WriteString(p.Input, "go nodes 800\n")
+
+		select {
+		case bestMove, ok := <-p.BestMove:
+			if !ok {
+				return errors.New("engine failed")
+			}
+			err := game.MoveStr(bestMove)
+			if err != nil {
+				return err
+			}
+			break Loop
+		case <-time.After(5 * time.Second):
+			log.Fatal("Benchmaking shows lc0 runs too slow")
+			log.Fatal("Use -bench=false to skip check benchmark")
+		}
+	}
+	*bench = false
+	return nil
 }
 
 func playMatch(baselinePath string, candidatePath string, params []string, flip bool) (int, string, string, error) {
@@ -610,6 +659,11 @@ func nextGame(httpClient *http.Client, count int) error {
 		if err != nil {
 			return err
 		}
+
+		err = benchmark(networkPath)
+		if err != nil {
+			log.Fatal(err)
+		}
 		candidatePath, err := getNetwork(httpClient, nextGame.CandidateSha, false)
 		if err != nil {
 			return err
@@ -631,6 +685,10 @@ func nextGame(httpClient *http.Client, count int) error {
 		networkPath, err := getNetwork(httpClient, nextGame.Sha, !*keep)
 		if err != nil {
 			return err
+		}
+		err = benchmark(networkPath)
+		if err != nil {
+			log.Fatal(err)
 		}
 		doneCh := make(chan bool)
 		go func() {
