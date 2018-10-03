@@ -25,6 +25,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"net/url"
 
 	"client"
 
@@ -37,6 +38,7 @@ var (
 	totalGames int
 	pendingNextGame *client.NextGameResponse
 	randId   int
+	book []*chess.Game
 
 	hostname = flag.String("hostname", "http://api.lczero.org", "Address of the server")
 	user     = flag.String("user", "", "Username")
@@ -329,7 +331,7 @@ func (c *cmdWrapper) launch(networkPath string, args []string, input bool) {
 	}
 }
 
-func playMatch(baselinePath string, candidatePath string, params []string, flip bool) (int, string, string, error) {
+func playMatch(baselinePath string, candidatePath string, params []string, flip bool, book_moves []*chess.Move) (int, string, string, error) {
 	baseline := createCmdWrapper()
 	params = append([]string{"uci"}, params...)
 	log.Println("launching 1")
@@ -367,6 +369,20 @@ func playMatch(baselinePath string, candidatePath string, params []string, flip 
 	game := chess.NewGame(chess.UseNotation(chess.LongAlgebraicNotation{}))
 	moveHistory := ""
 	turn := 0
+
+	if len(book_moves) > 0 {
+		moveHistory += " moves"
+		for i := 0; i < len(book_moves); i++ {
+			moveHistory += " " + chess.LongAlgebraicNotation{}.Encode(game.Position(), book_moves[i])
+			err := game.Move(book_moves[i])
+			if err != nil {
+				log.Println("Error in move")
+				return 0, "", "", err
+			}
+			turn++
+		}
+	}
+
 	for {
 		if turn >= 450 || game.Outcome() != chess.NoOutcome || len(game.EligibleDraws()) > 1 {
 			if game.Outcome() == chess.WhiteWon {
@@ -584,6 +600,60 @@ func getNetwork(httpClient *http.Client, sha string, clearOld bool) (string, err
 	return checkValidNetwork(dir, sha)
 }
 
+func getBook(httpClient *http.Client, book_url string) (string, error) {
+	dir := "books"
+	os.MkdirAll(dir, os.ModePerm)
+	u, err := url.Parse(book_url)
+	if err != nil {
+		return "", err
+	}
+	s := strings.Split(u.Path, "/")
+	book_name := s[len(s)-1]
+	path := filepath.Join(dir, book_name)
+	_, err = os.Stat(path)
+	if err == nil {
+		// Book is there, use it.
+		return path, nil
+	}
+
+	// Otherwise, let's download it
+	lock, err := acquireLock(dir, book_name)
+
+	if err != nil {
+		if err == lockfile.ErrBusy {
+			log.Println("Book download initiated by other client")
+			return "", err
+		} else {
+			log.Fatalf("Unable to lock: %v", err)
+		}
+	}
+
+	// Lockfile acquired, download it
+	defer lock.Unlock()
+	fmt.Println("Downloading book...")
+
+	r, err := httpClient.Get(book_url)
+	if err != nil {
+		return "", err
+	}
+
+	out, err := ioutil.TempFile(dir, book_name + "_tmp")
+	if err != nil {
+		return "", err
+	}
+
+	_, err = io.Copy(out, r.Body)
+	r.Body.Close()
+	out.Close()
+	if err == nil {
+		err = os.Rename(out.Name(), path)
+	}
+	// Ensure tmpfile is erased
+	os.Remove(out.Name())
+
+	return path, err
+}
+
 func nextGame(httpClient *http.Client, count int) error {
 	var nextGame client.NextGameResponse
 	var err error
@@ -615,7 +685,29 @@ func nextGame(httpClient *http.Client, count int) error {
 			return err
 		}
 		log.Println("Starting match")
-		result, pgn, version, err := playMatch(networkPath, candidatePath, serverParams, nextGame.Flip)
+
+		var bookMoves []*chess.Move
+
+		if nextGame.BookUrl != "" {
+			if book == nil {
+				book_path, err := getBook(&http.Client{}, nextGame.BookUrl)
+				if err != nil {
+					return err
+				}
+				file, err := os.Open(book_path)
+				if err != nil {
+					return err
+				}
+				book, err = chess.GamesFromPGN(file)
+				if err != nil {
+					return err
+				}
+				file.Close()
+			}
+			bookMoves = book[nextGame.BookGame].Moves()
+		}
+
+		result, pgn, version, err := playMatch(networkPath, candidatePath, serverParams, nextGame.Flip, bookMoves)
 		if err != nil {
 			log.Printf("playMatch: %v", err)
 			return err
