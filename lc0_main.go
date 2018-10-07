@@ -297,10 +297,8 @@ func (c *cmdWrapper) launch(networkPath string, args []string, input bool) {
 		log.Fatal(err)
 	}
 
-	stderr, err := c.Cmd.StderrPipe()
-	if err != nil {
-		log.Fatal(err)
-	}
+//	c.Cmd.Stderr = c.Cmd.Stdout
+c.Cmd.Stderr = os.Stdout
 
 	// If the game wasn't played with resign, and the engine supports it,
 	// this will be populated by the resign_report before the gameready
@@ -370,27 +368,6 @@ func (c *cmdWrapper) launch(networkPath string, args []string, input bool) {
 			}
 		}
 	}()
-
-	go func() {
-		stderrScanner := bufio.NewScanner(stderr)
-		for stderrScanner.Scan() {
-			line := stderrScanner.Text()
-			//			fmt.Printf("lc0: %s\n", line)
-			switch {
-			case strings.Contains(line, "Your GPU doesn't support FP16"):
-				log.Println("GPU doesn't support the cudnn-fp16 backend")
-				if *backopts == "" {
-					hasCudnnFp16 = false
-					c.Retry <- true
-				} else {
-					log.Fatal("Terminating")
-				}
-			default:
-				fmt.Println(line)
-			}
-		}
-	}()
-
 
 	if input {
 		c.openInput()
@@ -539,6 +516,10 @@ func train(httpClient *http.Client, ngr client.NextGameResponse,
 			}
 		case gi, ok := <-c.gi:
 			if !ok {
+if hasCudnnFp16 && totalGames==0 && *backopts==""{
+hasCudnnFp16=false
+return errors.New("retry")
+}
 				log.Printf("GameInfo channel closed, exiting train loop")
 				done = true
 				break
