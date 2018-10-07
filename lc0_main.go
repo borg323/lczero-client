@@ -297,7 +297,7 @@ func (c *cmdWrapper) launch(networkPath string, args []string, input bool) {
 		log.Fatal(err)
 	}
 
-	c.Cmd.Stderr = c.Cmd.Stdout
+	c.Cmd.Stderr = os.Stdout
 
 	// If the game wasn't played with resign, and the engine supports it,
 	// this will be populated by the resign_report before the gameready
