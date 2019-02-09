@@ -886,6 +886,13 @@ func hideLc0argsFlag() {
 func main() {
 	fmt.Printf("Lc0 client version %v\n", getExtraParams()["version"])
 
+	logFile, err := os.OpenFile("client_log.txt", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if err == nil {
+		defer logFile.Close()
+		writer := io.MultiWriter(os.Stdout, logFile)
+		log.SetOutput(writer)
+	}
+
 	testEP()
 
 	hideLc0argsFlag()
@@ -902,7 +909,7 @@ func main() {
 		log.Fatal("Training run number too large")
 	}
 	randBytes := make([]byte, 2)
-	_, err := rand.Reader.Read(randBytes)
+	_, err = rand.Reader.Read(randBytes)
 	if err != nil {
 		randId = -1
 	} else {
