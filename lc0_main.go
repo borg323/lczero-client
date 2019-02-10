@@ -384,7 +384,7 @@ func (c *cmdWrapper) launch(networkPath string, otherNetPath string, args []stri
 			case strings.HasPrefix(line, "bestmove "):
 				//				fmt.Println(line)
 				testedCudnnFp16 = true
-				c.BestMove <- strings.Split(line, " ")[1]
+//				c.BestMove <- strings.Split(line, " ")[1]
 			case strings.HasPrefix(line, "id name Lc0 "):
 				c.Version = strings.Split(line, " ")[3]
 				fmt.Println(line)
